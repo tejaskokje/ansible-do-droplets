@@ -1,0 +1,42 @@
+---
+- hosts: digitalocean
+  vars:
+    droplet_prefix: "droplet"
+    droplet_count: 5
+
+  tasks:
+    - name: ensure ssh key exists
+      user: >
+        name={{ ansible_user_id }}
+        generate_ssh_key=yes
+        ssh_key_file=.ssh/id_rsa_ansible
+
+    - name: ensure key exists at DigitalOcean
+      digital_ocean: >
+        state=present
+        command=ssh
+        name=my_ansible_ssh_key
+        ssh_pub_key={{ lookup('file', '~/.ssh/id_rsa_ansible.pub') }}
+      register: my_ansible_ssh_key
+
+    - name: ensure droplet one exists
+      digital_ocean: >
+        state=present
+        command=droplet
+        name="{{ droplet_prefix }}-{{ item }}"
+        size_id=512mb
+        region_id=sfo2
+        private_networking=yes
+        unique_name=yes
+        image_id=Ubuntu-16-04-x64
+        ssh_key_ids={{ my_ansible_ssh_key.ssh_key.id }}
+      with_sequence: count={{ droplet_count }}
+      register: droplet_details
+
+    - debug: msg="IP is {{ item.droplet.ip_address }}" 
+      with_items: droplet_details.results
+      when: item.invocation.module_args.state == "present"
+
+
+
+
